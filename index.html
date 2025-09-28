@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VØIDSTREAM</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="container">
+        <header>
+            <h1 data-text="VØIDSTREAM">VØIDSTREAM</h1>
+            <p>// Anonymous thoughts, deleted after 24 hours.</p>
+        </header>
+        <main>
+            <div class="input-area">
+                <textarea id="post-input" placeholder="> transmit to the void..."></textarea>
+                <button id="submit-post">COMMIT</button>
+            </div>
+            <div id="feed" class="feed">
+                </div>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
