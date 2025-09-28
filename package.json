@@ -1,0 +1,19 @@
+{
+  "name": "voidstream",
+  "version": "1.0.0",
+  "description": "Anonymous thoughts that disappear after 24 hours",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve -s . -l 3000",
+    "dev": "serve -s . -l 3000"
+  },
+  "dependencies": {
+    "serve": "^14.2.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "keywords": ["anonymous", "social", "ephemeral"],
+  "author": "Raghav1415",
+  "license": "MIT"
+}
