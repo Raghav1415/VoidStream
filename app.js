@@ -1,143 +1,128 @@
-body {
-    background-color: #0d0d0d;
-    color: #39FF14;
-    font-family: 'Fira Code', monospace;
-    margin: 0;
-    padding: 2rem;
-    overflow-x: hidden;
+// --- Supabase Client Setup ---
+// In a real project, these would be in a secure environment file.
+const SUPABASE_URL = 'YOUR_SUPABASE_URL'; // Replace with your Supabase Project URL
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY'; // Replace with your Supabase Anon Key
+
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// --- DOM Elements ---
+const postInput = document.getElementById('post-input');
+const submitButton = document.getElementById('submit-post');
+const feed = document.getElementById('feed');
+
+// --- Functions ---
+
+/**
+ * Fetches all posts from the database and renders them.
+ */
+async function fetchPosts() {
+    let { data: posts, error } = await supabase
+        .from('posts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching posts:', error);
+    } else {
+        renderPosts(posts);
+    }
 }
 
-.scanlines {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: repeating-linear-gradient(
-        0deg,
-        rgba(0, 0, 0, 0) 0,
-        rgba(0, 0, 0, 0) 2px,
-        rgba(255, 255, 255, 0.05) 3px,
-        rgba(255, 255, 255, 0.05) 4px
-    );
-    pointer-events: none;
-    animation: flicker 0.15s infinite;
+/**
+ * Renders an array of post objects to the DOM.
+ * @param {Array} posts - The array of posts to render.
+ */
+function renderPosts(posts) {
+    feed.innerHTML = ''; // Clear existing feed
+    for (const post of posts) {
+        const postEl = document.createElement('div');
+        postEl.classList.add('post');
+
+        const content = document.createElement('p');
+        content.classList.add('post-content');
+        content.textContent = post.content;
+        
+        const footer = document.createElement('div');
+        footer.classList.add('post-footer');
+        
+        const ttlSpan = document.createElement('span');
+        ttlSpan.classList.add('ttl');
+        
+        // Calculate and update the TTL countdown
+        const createdAt = new Date(post.created_at);
+        const expiresAt = createdAt.getTime() + (24 * 60 * 60 * 1000);
+
+        const updateTimer = () => {
+            const now = new Date().getTime();
+            const distance = expiresAt - now;
+
+            if (distance < 0) {
+                ttlSpan.textContent = 'EXPIRED';
+                // Optionally remove the element from the DOM
+                if(postEl.parentNode) {
+                   postEl.parentNode.removeChild(postEl);
+                }
+                clearInterval(timerInterval);
+                return;
+            }
+
+            const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            ttlSpan.textContent = `${hours}h ${minutes}m ${seconds}s`;
+        };
+
+        const timerInterval = setInterval(updateTimer, 1000);
+        updateTimer(); // Initial call
+        
+        footer.innerHTML = `// time-to-live: `;
+        footer.appendChild(ttlSpan);
+        
+        postEl.appendChild(content);
+        postEl.appendChild(footer);
+        feed.appendChild(postEl);
+    }
 }
 
-@keyframes flicker {
-  0% { opacity: 0.2; }
-  50% { opacity: 0.5; }
-  100% { opacity: 0.2; }
+/**
+ * Submits a new post to the database.
+ */
+async function addPost() {
+    const content = postInput.value.trim();
+    if (content.length > 0) {
+        const { data, error } = await supabase
+            .from('posts')
+            .insert([{ content: content }]);
+        
+        if (error) {
+            console.error('Error adding post:', error);
+        } else {
+            postInput.value = ''; // Clear input on success
+        }
+    }
 }
 
-.container {
-    max-width: 700px;
-    margin: auto;
-    border: 1px solid #39FF14;
-    padding: 20px;
-    box-shadow: 0 0 15px #39FF14;
-}
+// --- Event Listeners and Initializers ---
 
-h1 {
-    font-size: 2.5rem;
-    text-align: center;
-    margin-bottom: 0;
-    position: relative;
-    text-shadow: 0 0 5px #39FF14;
-}
+// Submit post when button is clicked
+submitButton.addEventListener('click', addPost);
 
-/* Glitch Effect */
-h1::after, h1::before {
-    content: attr(data-text);
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-}
-h1::before {
-    left: 2px;
-    text-shadow: -1px 0 red;
-    animation: glitch-anim-1 2s infinite linear alternate-reverse;
-}
-h1::after {
-    left: -2px;
-    text-shadow: -1px 0 blue;
-    animation: glitch-anim-2 2s infinite linear alternate-reverse;
-}
+// Listen for real-time changes (new posts)
+supabase.channel('custom-all-channel')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, (payload) => {
+    console.log('Change received!', payload);
+    fetchPosts(); // Re-fetch all posts to update the feed
+  })
+  .subscribe();
 
-@keyframes glitch-anim-1 { 0% { clip: rect(24px, 9999px, 9px, 0); } 100% { clip: rect(92px, 9999px, 98px, 0); } }
-@keyframes glitch-anim-2 { 0% { clip: rect(65px, 9999px, 119px, 0); } 100% { clip: rect(10px, 9999px, 5px, 0); } }
+// Initial fetch of posts when the page loads
+fetchPosts();
 
-
-header p {
-    text-align: center;
-    margin-top: 5px;
-    color: #a0a0a0;
-}
-
-.input-area {
-    display: flex;
-    flex-direction: column;
-    margin-top: 2rem;
-}
-
-textarea {
-    background-color: #1a1a1a;
-    border: 1px solid #39FF14;
-    color: #39FF14;
-    font-family: 'Fira Code', monospace;
-    font-size: 1rem;
-    padding: 10px;
-    resize: vertical;
-    min-height: 80px;
-}
-
-textarea:focus {
-    outline: none;
-    box-shadow: 0 0 10px #39FF14;
-}
-
-button {
-    background-color: #39FF14;
-    color: #0d0d0d;
-    border: none;
-    padding: 10px;
-    font-family: 'Fira Code', monospace;
-    font-weight: bold;
-    cursor: pointer;
-    margin-top: 10px;
-    transition: background-color 0.2s, color 0.2s;
-}
-
-button:hover {
-    background-color: #0d0d0d;
-    color: #39FF14;
-    border: 1px solid #39FF14;
-}
-
-.feed {
-    margin-top: 2rem;
-}
-
-.post {
-    border: 1px dashed #444;
-    padding: 15px;
-    margin-bottom: 15px;
-}
-
-.post-content {
-    white-space: pre-wrap; /* a good practice for user content */
-    word-wrap: break-word;
-}
-
-.post-footer {
-    text-align: right;
-    font-size: 0.8rem;
-    color: #a0a0a0;
-    margin-top: 10px;
-}
-
-.ttl {
-    color: #39FF14;
-}
+// Note on Auto-Deletion:
+// In Supabase, this is handled by a scheduled Edge Function.
+// 1. Create a database function `delete_old_posts()`:
+//    CREATE FUNCTION delete_old_posts() RETURNS void AS $$
+//    DELETE FROM posts WHERE created_at < now() - interval '24 hours';
+//    $$ LANGUAGE sql;
+// 2. Create an Edge Function that calls this database function.
+// 3. Schedule the Edge Function to run periodically (e.g., every hour) using a cron job.
