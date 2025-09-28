@@ -1,5 +1,9 @@
 // --- Configuration ---
 
+# Supabase Configuration
+const SUPABASE_URL = window.REPLIT_DB_URL || 'https://kkfmxgtiihyfwuwfqiju.supabase.co';
+const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrZm14Z3RpaWh5Znd1d2ZxaWp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNjA4ODQsImV4cCI6MjA3NDYzNjg4NH0.B6hz3pw-SSiBKZ899zWPN9MRJ_wLucSc4IycpEzTMFY';
+
 const MAX_POST_LENGTH = 500;
 const RETRY_ATTEMPTS = 3;
 const RETRY_DELAY = 1000;
