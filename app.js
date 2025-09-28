@@ -4,8 +4,18 @@ const MAX_POST_LENGTH = 500;
 const RETRY_ATTEMPTS = 3;
 const RETRY_DELAY = 1000;
 
+// --- Replit Detection ---
+const isReplit = window.location.hostname.includes('replit') || window.location.hostname.includes('repl.it');
+
 // --- Supabase Client Setup ---
-const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let _supabase;
+try {
+    _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log('✅ Supabase connected successfully');
+} catch (error) {
+    console.error('❌ Failed to connect to Supabase:', error);
+    showErrorMessage('Database connection failed. Please check configuration.');
+}
 
 // --- DOM Elements ---
 const postInput = document.getElementById('post-input');
@@ -15,36 +25,59 @@ const feed = document.getElementById('feed');
 // --- Global State ---
 let activeTimers = new Set();
 let isLoading = false;
+let connectionStatus = 'checking';
 
 // --- Utility Functions ---
 
 /**
- * Shows error message to user
- * @param {string} message - Error message to display
+ * Shows status message to user
+ * @param {string} message - Message to display
+ * @param {string} type - Message type ('error', 'success', 'info')
  */
-function showErrorMessage(message) {
-    // Create error element
-    const errorEl = document.createElement('div');
-    errorEl.className = 'error-message';
-    errorEl.textContent = message;
-    errorEl.style.cssText = `
-        background-color: #ff4444;
-        color: white;
+function showMessage(message, type = 'info') {
+    const messageEl = document.createElement('div');
+    messageEl.className = `message message-${type}`;
+    messageEl.textContent = message;
+    
+    const styles = {
+        error: 'background-color: #ff4444; color: white;',
+        success: 'background-color: #44ff44; color: #0d0d0d;',
+        info: 'background-color: #39FF14; color: #0d0d0d;'
+    };
+    
+    messageEl.style.cssText = `
+        ${styles[type]}
         padding: 10px;
         margin: 10px 0;
         border-radius: 4px;
         text-align: center;
+        animation: slideIn 0.3s ease;
+        position: relative;
+        z-index: 1000;
     `;
     
     // Insert at top of feed
-    feed.insertBefore(errorEl, feed.firstChild);
+    feed.insertBefore(messageEl, feed.firstChild);
     
     // Remove after 5 seconds
     setTimeout(() => {
-        if (errorEl.parentNode) {
-            errorEl.parentNode.removeChild(errorEl);
+        if (messageEl.parentNode) {
+            messageEl.style.opacity = '0';
+            setTimeout(() => {
+                if (messageEl.parentNode) {
+                    messageEl.parentNode.removeChild(messageEl);
+                }
+            }, 300);
         }
     }, 5000);
+}
+
+function showErrorMessage(message) {
+    showMessage(message, 'error');
+}
+
+function showSuccessMessage(message) {
+    showMessage(message, 'success');
 }
 
 /**
@@ -55,6 +88,12 @@ function setLoadingState(loading) {
     isLoading = loading;
     submitButton.disabled = loading;
     submitButton.textContent = loading ? 'TRANSMITTING...' : 'COMMIT';
+    
+    if (loading) {
+        submitButton.style.animation = 'pulse 1s infinite';
+    } else {
+        submitButton.style.animation = '';
+    }
 }
 
 /**
@@ -83,12 +122,41 @@ async function withRetry(operation, attempts = RETRY_ATTEMPTS) {
     }
 }
 
+/**
+ * Check database connection
+ */
+async function checkConnection() {
+    try {
+        if (!_supabase) throw new Error('Supabase not initialized');
+        
+        const { data, error } = await _supabase
+            .from('posts')
+            .select('id')
+            .limit(1);
+            
+        if (error) throw error;
+        
+        connectionStatus = 'connected';
+        console.log('✅ Database connection verified');
+        return true;
+    } catch (error) {
+        connectionStatus = 'error';
+        console.error('❌ Database connection failed:', error);
+        return false;
+    }
+}
+
 // --- Main Functions ---
 
 /**
  * Fetches all posts from the database and renders them.
  */
 async function fetchPosts() {
+    if (connectionStatus === 'error') {
+        showErrorMessage('Database connection lost. Please refresh the page.');
+        return;
+    }
+    
     try {
         const { data: posts, error } = await withRetry(async () => {
             const result = await _supabase
@@ -105,9 +173,22 @@ async function fetchPosts() {
         clearAllTimers(); // Clear existing timers
         renderPosts(posts || []);
         
+        if (connectionStatus === 'checking') {
+            connectionStatus = 'connected';
+            showSuccessMessage('✅ Connected to VoidStream network');
+        }
+        
     } catch (error) {
         console.error('Error fetching posts:', error);
-        showErrorMessage('Failed to load posts. Please refresh the page.');
+        connectionStatus = 'error';
+        showErrorMessage('Failed to load transmissions. Retrying...');
+        
+        // Auto-retry after 3 seconds
+        setTimeout(() => {
+            if (connectionStatus === 'error') {
+                fetchPosts();
+            }
+        }, 3000);
     }
 }
 
@@ -121,7 +202,13 @@ function renderPosts(posts) {
     if (posts.length === 0) {
         const emptyEl = document.createElement('div');
         emptyEl.className = 'empty-state';
-        emptyEl.innerHTML = '<p style="text-align: center; color: #666;">// No transmissions detected. The void awaits...</p>';
+        emptyEl.innerHTML = `
+            <p style="text-align: center; color: #666; padding: 40px 20px;">
+                // No transmissions detected. The void awaits your thoughts...
+                <br><br>
+                ${isReplit ? '<small>🚀 Running on Replit</small>' : ''}
+            </p>
+        `;
         feed.appendChild(emptyEl);
         return;
     }
@@ -150,9 +237,11 @@ function renderPosts(posts) {
 
             if (distance < 0) {
                 ttlSpan.textContent = 'EXPIRED';
-                // Remove expired post
+                ttlSpan.style.color = '#ff4444';
+                // Remove expired post with fade effect
                 if (postEl.parentNode) {
-                    postEl.style.opacity = '0.5';
+                    postEl.style.transition = 'opacity 2s ease';
+                    postEl.style.opacity = '0.3';
                     setTimeout(() => {
                         if (postEl.parentNode) {
                             postEl.parentNode.removeChild(postEl);
@@ -165,7 +254,17 @@ function renderPosts(posts) {
             const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
             const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+            
             ttlSpan.textContent = `${hours}h ${minutes}m ${seconds}s`;
+            
+            // Color coding for urgency
+            if (hours < 1) {
+                ttlSpan.style.color = '#ff4444'; // Red for less than 1 hour
+            } else if (hours < 6) {
+                ttlSpan.style.color = '#ffaa44'; // Orange for less than 6 hours
+            } else {
+                ttlSpan.style.color = '#39FF14'; // Green for more than 6 hours
+            }
         };
 
         const timerInterval = setInterval(updateTimer, 1000);
@@ -187,17 +286,22 @@ function renderPosts(posts) {
 async function addPost() {
     if (isLoading) return;
     
+    if (connectionStatus === 'error') {
+        showErrorMessage('Cannot transmit: Database connection lost');
+        return;
+    }
+    
     const content = postInput.value.trim();
     
     // Input validation
     if (content.length === 0) {
-        showErrorMessage('Post cannot be empty');
+        showErrorMessage('Transmission cannot be empty');
         postInput.focus();
         return;
     }
     
     if (content.length > MAX_POST_LENGTH) {
-        showErrorMessage(`Post too long (max ${MAX_POST_LENGTH} characters)`);
+        showErrorMessage(`Transmission too long (max ${MAX_POST_LENGTH} characters)`);
         return;
     }
     
@@ -216,10 +320,12 @@ async function addPost() {
         if (error) throw error;
         
         postInput.value = ''; // Clear input on success
+        updateCharCount();
+        showSuccessMessage('✅ Transmission sent to the void');
         
     } catch (error) {
         console.error('Error adding post:', error);
-        showErrorMessage('Failed to transmit post. Please try again.');
+        showErrorMessage('Failed to transmit. Signal lost. Please try again.');
     } finally {
         setLoadingState(false);
     }
@@ -230,25 +336,30 @@ async function addPost() {
  */
 function updateCharCount() {
     const count = postInput.value.length;
-    const charCountEl = document.getElementById('char-count') || createCharCountElement();
+    let charCountEl = document.getElementById('char-count');
+    
+    if (!charCountEl) {
+        charCountEl = document.createElement('div');
+        charCountEl.id = 'char-count';
+        charCountEl.style.cssText = `
+            text-align: right;
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 5px;
+            transition: color 0.2s ease;
+        `;
+        postInput.parentNode.appendChild(charCountEl);
+    }
+    
     charCountEl.textContent = `${count}/${MAX_POST_LENGTH}`;
-    charCountEl.style.color = count > MAX_POST_LENGTH ? '#ff4444' : '#666';
-}
-
-/**
- * Creates character count element
- */
-function createCharCountElement() {
-    const charCountEl = document.createElement('div');
-    charCountEl.id = 'char-count';
-    charCountEl.style.cssText = `
-        text-align: right;
-        font-size: 0.8rem;
-        color: #666;
-        margin-top: 5px;
-    `;
-    postInput.parentNode.appendChild(charCountEl);
-    return charCountEl;
+    
+    if (count > MAX_POST_LENGTH) {
+        charCountEl.style.color = '#ff4444';
+    } else if (count > MAX_POST_LENGTH * 0.8) {
+        charCountEl.style.color = '#ffaa44';
+    } else {
+        charCountEl.style.color = '#666';
+    }
 }
 
 // --- Event Listeners and Initializers ---
@@ -267,17 +378,30 @@ postInput.addEventListener('keydown', (e) => {
 // Update character count as user types
 postInput.addEventListener('input', updateCharCount);
 
-// Listen for real-time changes (new posts)
-_supabase.channel('custom-all-channel')
-    .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'posts' 
-    }, (payload) => {
-        console.log('Change received!', payload);
-        fetchPosts(); // Re-fetch all posts to update the feed
-    })
-    .subscribe();
+// Listen for real-time changes (new posts) with error handling
+function setupRealtimeSubscription() {
+    if (!_supabase) return;
+    
+    try {
+        _supabase.channel('custom-all-channel')
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'posts' 
+            }, (payload) => {
+                console.log('📡 Real-time update received:', payload);
+                setTimeout(fetchPosts, 500); // Small delay to ensure consistency
+            })
+            .subscribe((status) => {
+                console.log('📡 Real-time subscription status:', status);
+                if (status === 'SUBSCRIBED') {
+                    console.log('✅ Real-time updates enabled');
+                }
+            });
+    } catch (error) {
+        console.error('❌ Failed to setup real-time subscription:', error);
+    }
+}
 
 // Handle page visibility changes (pause/resume timers)
 document.addEventListener('visibilitychange', () => {
@@ -293,8 +417,37 @@ window.addEventListener('beforeunload', () => {
     clearAllTimers();
 });
 
-// Initial setup
-document.addEventListener('DOMContentLoaded', () => {
+// Handle connection issues
+window.addEventListener('online', () => {
+    console.log('🌐 Connection restored');
+    showSuccessMessage('Connection restored');
     fetchPosts();
+});
+
+window.addEventListener('offline', () => {
+    console.log('📡 Connection lost');
+    showErrorMessage('Connection lost. Posts will sync when reconnected.');
+});
+
+// Initial setup
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 VoidStream initializing...');
+    
+    if (isReplit) {
+        console.log('🔧 Running on Replit environment');
+        showMessage('🚀 VoidStream deployed on Replit', 'info');
+    }
+    
     updateCharCount();
+    
+    // Check connection and initialize
+    const connected = await checkConnection();
+    if (connected) {
+        await fetchPosts();
+        setupRealtimeSubscription();
+    } else {
+        showErrorMessage('Failed to connect to database. Please check configuration.');
+    }
+    
+    console.log('✅ VoidStream ready');
 });
