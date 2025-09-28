@@ -1,7 +1,7 @@
 // --- Supabase Client Setup ---
 // In a real project, these would be in a secure environment file.
-const SUPABASE_URL = 'https://kkfmxgtiihyfwuwfqiju.supabase.co'; // Replace with your Supabase Project URL
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrZm14Z3RpaWh5Znd1d2ZxaWp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNjA4ODQsImV4cCI6MjA3NDYzNjg4NH0.B6hz3pw-SSiBKZ899zWPN9MRJ_wLucSc4IycpEzTMFY'; // Replace with your Supabase Anon Key
+const SUPABASE_URL = 'https://kkfmxgtiihyfwuwfqiju.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtrZm14Z3RpaWh5Znd1d2ZxaWp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNjA4ODQsImV4cCI6MjA3NDYzNjg4NH0.B6hz3pw-SSiBKZ899zWPN9MRJ_wLucSc4IycpEzTMFY';
 
 const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -33,7 +33,7 @@ async function fetchPosts() {
  * @param {Array} posts - The array of posts to render.
  */
 function renderPosts(posts) {
-    feed.innerHTML = ''; // Clear existing feed
+    feed.innerHTML = ''; // Clears existing feed
     for (const post of posts) {
         const postEl = document.createElement('div');
         postEl.classList.add('post');
@@ -48,7 +48,7 @@ function renderPosts(posts) {
         const ttlSpan = document.createElement('span');
         ttlSpan.classList.add('ttl');
         
-        // Calculate and update the TTL countdown
+        // Calculates and updates the TTL countdown
         const createdAt = new Date(post.created_at);
         const expiresAt = createdAt.getTime() + (24 * 60 * 60 * 1000);
 
@@ -58,7 +58,7 @@ function renderPosts(posts) {
 
             if (distance < 0) {
                 ttlSpan.textContent = 'EXPIRED';
-                // Optionally remove the element from the DOM
+                // Optionally removes the element from the DOM
                 if(postEl.parentNode) {
                    postEl.parentNode.removeChild(postEl);
                 }
@@ -97,7 +97,7 @@ async function addPost() {
         if (error) {
             console.error('Error adding post:', error);
         } else {
-            postInput.value = ''; // Clear input on success
+            postInput.value = ''; // Clears input on success
         }
     }
 }
